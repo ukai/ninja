@@ -29,6 +29,7 @@
 #include "build_log.h"
 #include "disk_interface.h"
 #include "graph.h"
+#include "metrics.h"
 #include "state.h"
 #include "subprocess.h"
 #include "util.h"
@@ -785,4 +786,20 @@ void Builder::FinishEdge(Edge* edge, bool success, const string& output) {
   status_->BuildEdgeFinished(edge, success, output, &start_time, &end_time);
   if (success && log_)
     log_->RecordCommand(edge, start_time, end_time, restat_mtime);
+
+  if (g_metrics) {
+    static map<string, Metric*> rule_metrics;
+    Metric* metric = NULL;
+    const string& rule_name = "rule " + edge->rule().name();
+    pair<map<string, Metric*>::iterator, bool> p =
+        rule_metrics.insert(make_pair(rule_name, metric));
+    if (p.second) {
+      metric = g_metrics->NewMetric(rule_name);
+      p.first->second = metric;
+    } else {
+      metric = p.first->second;
+    }
+    ++metric->count;
+    metric->sum += end_time - start_time;
+  }
 }
